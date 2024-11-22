@@ -1,3 +1,3 @@
-# llamie
+# llami
 
 cooking something cool
