@@ -1,7 +1,6 @@
 from fastapi import FastAPI, WebSocket
 from typing import Optional
 from dataclasses import dataclass
-from llami.configs.policy_extraction_prompt import get_extraction_prompt
 
 import os 
 import sys
@@ -11,6 +10,7 @@ import subprocess
 project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), "../.."))
 sys.path.append(".")
 
+from llami.configs.policy_extraction_prompt import get_extraction_prompt
 from llami.robot.robot_router import run_policy
 from lerobot.common.robot_devices.robots.factory import make_robot
 from lerobot.common.robot_devices.robots.utils import Robot
@@ -26,6 +26,14 @@ class RobotConnection:
 @dataclass
 class LlamaRequest(BaseModel):
     prompt: str
+
+def available_policies():
+    """
+    Return the list of available policies in configs/trained_policies
+    """
+    directory = "llami/configs/trained_policies/"
+    return [f.name[:-5] for f in os.scandir(directory) if f.name.endswith(".yaml")]
+
 
 class RobotServer:
     def __init__(self, robot_config_path: Optional[str] = None):
@@ -87,11 +95,18 @@ class RobotServer:
             binary_llama = directory+"llama_main_xnnpack_arm"
             model_weights = directory+"llama3_2_xnn.pte"
             tokenizer = directory+"tokenizer.model"
-            command = [binary_llama, "--model_path", model_weights, "--tokenizer_path", tokenizer, "--prompt", request.prompt]
+            command = [
+                binary_llama, 
+                "--model_path", 
+                model_weights, 
+                "--tokenizer_path", 
+                tokenizer, 
+                "--prompt", 
+                prompt
+            ]
             text = subprocess.run(command, capture_output=True).stdout
-            
-            policy_name = self.extract_policy(text)
-            
+
+            policy_name = self.extract_policy(text)            
             run_policy(
                 robot=self.robot,
                 policy_name=policy_name
@@ -99,13 +114,6 @@ class RobotServer:
             
             return {"status": "ok"}
         
-    def available_policies():
-        """
-        Return the list of available policies in configs/trained_policies
-        """
-        directory = "llami/configs/trained_policies/"
-        return [f.name[:-5] for f in os.scandir(directory) if f.name.endswith(".yaml")]
-
     def extract_answer_from_llama_output(output: str):
         """
         Some additional information is printed after the answer, we need to remove it (performance metrics, etc.)
@@ -114,17 +122,18 @@ class RobotServer:
         return output[:eot_id]
 
     # Process the text to extract the policy
-    def extract_policy(self, text: str):
-        available_policies = self.available_policies()
+    def extract_policy(self, text: bytes):
+        text = text.decode("utf-8")
+        policies = available_policies()
 
         # Easy version supposing all policies are of the form "grab_object"
-        objects = [policy.split("_")[1] for policy in available_policies]
+        objects = [policy.split("_")[1] for policy in policies]
         for ind, object in enumerate(objects):
             if object in text:
-                return available_policies[ind]
+                return policies[ind]
         
         # Actually we should rerun Llama if no policy is found
-        return available_policies[0]  # Default policy
+        return policies[0]  # Default policy
 
 
 if __name__ == "__main__":
