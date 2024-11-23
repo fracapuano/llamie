@@ -1,0 +1,16 @@
+[tool.poetry]
+name = "llami"
+version = "0.1.0"
+description = "cheap fully local robotics for assisted living"
+authors = ["Francesco Capuano <francesco_capuano@aol.com>"]
+license = "MIT"
+readme = "README.md"
+
+[tool.poetry.dependencies]
+python = "^3.10"
+lerobot = "^0.1.0"
+
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
