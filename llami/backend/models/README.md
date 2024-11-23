@@ -1,2 +1,2 @@
 # Add your models here
-binary, model.pt, tokenizer.model
+binary, model.pte, tokenizer.model
