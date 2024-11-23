@@ -78,10 +78,10 @@ class RobotServer:
         
         @self.app.post("/llama")
         async def llama(request: LlamaRequest):
-            dir = "llami/backend/models/"
-            binary_llamam = dir+"llama_main_xnnpack_arm"
-            model_weights = dir+"llama3_2_xnn.pte"
-            tokenizer = dir+"tokenizer.model"
+            directory = "llami/backend/models/"
+            binary_llamam = directory+"llama_main_xnnpack_arm"
+            model_weights = directory+"llama3_2_xnn.pte"
+            tokenizer = directory+"tokenizer.model"
             command = [binary_llamam, "--model_path", model_weights, "--tokenizer_path", tokenizer, "--prompt", request.prompt]
             text = subprocess.run(command, capture_output=True).stdout
             # policy = extract_policy(text)
