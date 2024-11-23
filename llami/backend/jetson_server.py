@@ -2,20 +2,39 @@ from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 import httpx
 from llami.backend.robot_server import extract_policy
-
+from llami.configs.policy_extraction_prompt import get_extraction_prompt
 app = FastAPI()
 
-# Define input schema
-class PromptRequest(BaseModel):
-    whisper_output: str
+def available_policies():
+    """
+    Return the list of available policies in configs/trained_policies
+    """
+    directory = "llami/configs/trained_policies/"
+    return [f.name[:-5] for f in os.scandir(directory) if f.name.endswith(".yaml")]
 
+def extract_policy(text: str):
+    policies = available_policies()
+
+    # Easy version supposing all policies are of the form "grab_object"
+    objects = [policy.split("_")[1] for policy in policies]
+    for ind, object in enumerate(objects):
+        if object in text:
+            return policies[ind]
+    
+    # Actually we should rerun Llama if no policy is found
+    return policies[0]  # Default policy
+
+# Define input schema
+class LlamaRequest(BaseModel):
+    prompt: str
 # Define the endpoint
 @self.app.post("/llama")
-async def process_prompt(prompt_request: PromptRequest):
+async def process_prompt(prompt_request: LlamaRequest):
     # Prepare the payload for the POST request
     
+    prompt = get_extraction_prompt(prompt_request.prompt)
     payload = {
-        "prompt": prompt_request.prompt,
+        "prompt": prompt,
         "n_predict": 128
     }
     
