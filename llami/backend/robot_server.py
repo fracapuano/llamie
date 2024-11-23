@@ -83,16 +83,42 @@ class RobotServer:
             model_weights = directory+"llama3_2_xnn.pte"
             tokenizer = directory+"tokenizer.model"
             command = [binary_llamam, "--model_path", model_weights, "--tokenizer_path", tokenizer, "--prompt", request.prompt]
-            text = subprocess.run(command, capture_output=True).stdout
-            # policy = extract_policy(text)
+            output = subprocess.run(command, capture_output=True).stdout
+            text = extract_answer_from_llama_output(output)
+            policy = extract_policy(text)
             # execute_policy(policy)
-            print(text) # temporary
+            print(text, policy) # temporary
+            run_policy(
+                robot=self.robot,
+                policy_name=policy
+            )
             return {"status": "ok"}
         
+        def available_policies():
+            """
+            Return the list of available policies in configs/trained_policies
+            """
+            directory = "llami/configs/trained_policies/"
+            return [f.name[:-5] for f in os.scandir(directory) if f.name.endswith(".yaml")]
+
+        def extract_answer_from_llama_output(output: str):
+            """
+            Some additional information is printed after the answer, we need to remove it (performance metrics, etc.)
+            """
+            eot_id = output.find("PyTorchObserver")
+            return output[:eot_id]
+
         # Process the text to extract the policy
         def extract_policy(text: str):
-            # TODO: Implement policy extraction
-            pass
+            available_policies = self.available_policies()
+
+            # Easy version supposing all policies are of the form "grab_object"
+            objects = [policy.split("_")[1] for policy in available_policies]
+            for ind, object in enumerate(objects):
+                if object in text:
+                    return available_policies[ind]
+            # Actually we should rerun Llama if no policy is found
+            return available_policies[0]  # Default policy
 
 if __name__ == "__main__":
     import uvicorn
