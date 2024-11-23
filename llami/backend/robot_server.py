@@ -4,6 +4,7 @@ from dataclasses import dataclass
 
 import os 
 import sys
+import subprocess
 
 # Add project root to Python path
 project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), "../.."))
@@ -14,10 +15,16 @@ from lerobot.common.robot_devices.robots.factory import make_robot
 from lerobot.common.robot_devices.robots.utils import Robot
 from lerobot.common.utils.utils import init_hydra_config
 
+from pydantic import BaseModel
+
 @dataclass
 class RobotConnection:
     robot: Robot
     active: bool = False
+
+@dataclass
+class LlamaRequest(BaseModel):
+    prompt: str
 
 class RobotServer:
     def __init__(self, robot_config_path: Optional[str] = None):
@@ -68,6 +75,24 @@ class RobotServer:
                     await websocket.send_json({"status": f"Executed policy: {policy_name}"})
             except Exception:
                 await websocket.close()
+        
+        @self.app.post("/llama")
+        async def llama(request: LlamaRequest):
+            dir = "llami/backend/models/"
+            binary_llamam = dir+"llama_main_xnnpack_arm"
+            model_weights = dir+"llama3_2_xnn.pte"
+            tokenizer = dir+"tokenizer.model"
+            command = [binary_llamam, "--model_path", model_weights, "--tokenizer_path", tokenizer, "--prompt", request.prompt]
+            text = subprocess.run(command, capture_output=True).stdout
+            # policy = extract_policy(text)
+            # execute_policy(policy)
+            print(text) # temporary
+            return {"status": "ok"}
+        
+        # Process the text to extract the policy
+        def extract_policy(text: str):
+            # TODO: Implement policy extraction
+            pass
 
 if __name__ == "__main__":
     import uvicorn
