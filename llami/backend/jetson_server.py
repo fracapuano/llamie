@@ -13,6 +13,7 @@ class PromptRequest(BaseModel):
 @self.app.post("/llama")
 async def process_prompt(prompt_request: PromptRequest):
     # Prepare the payload for the POST request
+    
     payload = {
         "prompt": prompt_request.prompt,
         "n_predict": 128
