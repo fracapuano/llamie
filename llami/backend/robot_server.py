@@ -5,6 +5,8 @@ from dataclasses import dataclass
 import os 
 import sys
 import subprocess
+import ssl
+from pathlib import Path
 
 # Add project root to Python path
 project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), "../.."))
@@ -17,6 +19,13 @@ from lerobot.common.robot_devices.robots.utils import Robot
 from lerobot.common.utils.utils import init_hydra_config
 
 from pydantic import BaseModel
+from fastapi.middleware.cors import CORSMiddleware
+
+
+origins = [
+    "*"
+]
+
 
 @dataclass
 class RobotConnection:
@@ -39,12 +48,25 @@ class RobotServer:
     def __init__(self, robot_config_path: Optional[str] = None):
         self.robot_config_path = robot_config_path if robot_config_path else "llami/configs/robot/moss.yaml"
         self.app = FastAPI()
-        
+
+        self.app.add_middleware(
+            CORSMiddleware,
+            allow_origins=origins,
+            allow_credentials=True,
+            allow_methods=["*"],
+            allow_headers=["*"],
+        )
+
         self.robot = make_robot(
             init_hydra_config(self.robot_config_path)
         )
         self.robot.connect()
         self.policy_extraction_prompt = get_extraction_prompt
+
+        # Add SSL configuration
+        self.ssl_keyfile = "key.pem"
+        self.ssl_certfile = "cert.pem"
+        self.check_or_create_ssl_certificates()
 
         # this sets up the app routes
         self.setup_routes()
@@ -61,6 +83,10 @@ class RobotServer:
             if self.robot and self.robot.is_connected:
                 self.robot.disconnect()
             return {"status": "Robot disconnected"}
+        
+        @self.app.get("/")
+        async def root():
+            return {"status": "ok"}
 
         @self.app.get("/execute_policy/{policy_name}")
         async def execute_policy(policy_name: str):
@@ -106,7 +132,8 @@ class RobotServer:
             ]
             text = subprocess.run(command, capture_output=True).stdout
 
-            policy_name = self.extract_policy(text)            
+            policy_name = self.extract_policy(text)
+
             run_policy(
                 robot=self.robot,
                 policy_name=policy_name
@@ -135,9 +162,26 @@ class RobotServer:
         # Actually we should rerun Llama if no policy is found
         return policies[0]  # Default policy
 
+    def check_or_create_ssl_certificates(self):
+        """Create self-signed certificates if they don't exist"""
+        if not (Path(self.ssl_keyfile).exists() and Path(self.ssl_certfile).exists()):
+            subprocess.run([
+                'openssl', 'req', '-x509', '-newkey', 'rsa:4096', '-nodes',
+                '-out', self.ssl_certfile,
+                '-keyout', self.ssl_keyfile,
+                '-days', '365',
+                '-subj', '/CN=localhost'
+            ])
+
 
 if __name__ == "__main__":
     import uvicorn
 
     server = RobotServer()
-    uvicorn.run(server.app, host="localhost", port=8080)
+    uvicorn.run(
+        server.app, 
+        host="0.0.0.0", 
+        port=8443,  # Standard HTTPS port
+        ssl_keyfile=server.ssl_keyfile,
+        ssl_certfile=server.ssl_certfile
+    )
