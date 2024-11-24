@@ -120,7 +120,6 @@ def run_policy(
 ):
     """Execute a specific robotic policy."""
     _ = load_dotenv(find_dotenv())
-    robot.connect()
 
     # Load available models from YAML files
     models = get_available_policies()
