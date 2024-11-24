@@ -1,3 +1,4 @@
+import os
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 import httpx
@@ -28,7 +29,8 @@ def extract_policy(text: str):
 class LlamaRequest(BaseModel):
     prompt: str
 # Define the endpoint
-@self.app.post("/llama")
+
+@app.post("/llama")
 async def process_prompt(prompt_request: LlamaRequest):
     # Prepare the payload for the POST request
     
